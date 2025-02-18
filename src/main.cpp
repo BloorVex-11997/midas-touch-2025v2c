@@ -6,12 +6,14 @@
 #include "uvlib/input/controller.hpp"
 #include "uvlib/input/trigger.hpp"
 #include "uvlib/scheduler.hpp"
+#include <cstdint>
 
 Drivetrain drivetrain;
 uvl::Controller master(pros::E_CONTROLLER_MASTER);
 
-std::string routine_a_state = "invalid";
-std::string routine_b_state = "invalid";
+std::string routine_a_state = "uninitialized";
+std::string routine_b_state = "uninitialized";
+std::string routine_c_state = "uninitialized";
 
 void noop() {}
 
@@ -63,6 +65,9 @@ void initialize() {
 
             pros::lcd::set_text(6,
                                 std::string("Routine B: ") + routine_b_state);
+
+            pros::lcd::set_text(7,
+                                std::string("Routine C: ") + routine_c_state);
 
             artificial_tick++;
           },
@@ -158,7 +163,7 @@ pros::delay(20);           // Run for 20 ms then update
       [](bool interrupted) {
         routine_a_state = interrupted ? "interrupted" : "success";
       },
-      {});
+      {&drivetrain});
 
   uint32_t routine_b_start = 0;
   uvl::FunctionCommand routine_b(
@@ -175,13 +180,58 @@ pros::delay(20);           // Run for 20 ms then update
       [](bool interrupted) {
         routine_b_state = interrupted ? "interrupted" : "success";
       },
-      {});
+      {&drivetrain});
+
+  uint32_t routine_c_start_a = 0;
+  uint32_t routine_c_start_b = 0;
+
+  uvl::CommandPtr routine_c =
+      uvl::FunctionCommand(
+          [&routine_c_start_a]() {
+            routine_c_start_a = pros::millis();
+            routine_c_state = "A - initialized";
+            drivetrain.set_voltage(50);
+          },
+          []() {
+            routine_c_state =
+                "A - executing - " + std::to_string(pros::millis());
+          },
+          [&routine_c_start_a]() {
+            return pros::millis() >= routine_c_start_a + 1;
+          },
+          [](bool interrupted) {
+            drivetrain.set_voltage(0);
+            routine_c_state = interrupted ? "A - interrupted" : "A - success";
+          },
+          {&drivetrain})
+          .and_then(uvl::FunctionCommand(
+                        [&routine_c_start_b]() {
+                          routine_c_start_b = pros::millis();
+                          routine_c_state = "B - initialized";
+                          drivetrain.set_voltage(-50);
+                        },
+                        []() {
+                          routine_c_state = "B - executing - " +
+                                            std::to_string(pros::millis());
+                        },
+                        [&routine_c_start_b]() {
+                          return pros::millis() >= routine_c_start_b + 1;
+                        },
+                        [](bool interrupted) {
+                          drivetrain.set_voltage(0);
+                          routine_c_state =
+                              interrupted ? "B - interrupted" : "B - success";
+                        },
+                        {&drivetrain})
+                        .to_ptr());
 
   master.get_trigger(uvl::TriggerButton::kA)
       .on_true(std::move(routine_a).to_ptr());
 
   master.get_trigger(uvl::TriggerButton::kB)
       .while_true(std::move(routine_b).to_ptr());
+
+  master.get_trigger(uvl::TriggerButton::kX).on_true(std::move(routine_c));
 
   uvl::Scheduler::get_instance().mainloop();
 }
