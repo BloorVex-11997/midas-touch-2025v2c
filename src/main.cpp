@@ -1,20 +1,19 @@
 #include "main.h"
+#include "commands/drive/teleop_drive.hpp"
+#include "pros/misc.h"
+#include "subsystems/drivetrain/drivetrain.hpp"
+#include "uvlib/enums.hpp"
+#include "uvlib/input/controller.hpp"
+#include "uvlib/input/trigger.hpp"
+#include "uvlib/scheduler.hpp"
 
-/**
- * A callback function for LLEMU's center button.
- *
- * When this callback is fired, it will toggle line 2 of the LCD text between
- * "I was pressed!" and nothing.
- */
-void on_center_button() {
-	static bool pressed = false;
-	pressed = !pressed;
-	if (pressed) {
-		pros::lcd::set_text(2, "I was pressed!");
-	} else {
-		pros::lcd::clear_line(2);
-	}
-}
+Drivetrain drivetrain;
+uvl::Controller master(pros::E_CONTROLLER_MASTER);
+
+std::string routine_a_state = "invalid";
+std::string routine_b_state = "invalid";
+
+void noop() {}
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -23,10 +22,55 @@ void on_center_button() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
-	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello PROS User!");
+  pros::lcd::initialize();
 
-	pros::lcd::register_btn1_cb(on_center_button);
+  drivetrain.set_default_command(TeleopDrive(&drivetrain, &master).to_ptr());
+
+  int artificial_tick = 0;
+
+  /* Debugging Command */
+  uvl::Scheduler::get_instance().schedule_command(
+      uvl::FunctionCommand(
+          []() {},
+          [&artificial_tick]() {
+            pros::lcd::set_text(0, "Tick Number: " +
+                                       std::to_string(artificial_tick));
+            pros::lcd::set_text(
+                1, "Scheduled Commands: " +
+                       std::to_string(uvl::Scheduler::get_instance()
+                                          .get_scheduled_commands()
+                                          .size()));
+            pros::lcd::set_text(
+                2, "Scheduler Owned: " +
+                       std::to_string(uvl::Scheduler::get_instance()
+                                          .get_owned_commands()
+                                          .size()));
+
+            pros::lcd::set_text(
+                3, "Active Subsystems: " +
+                       std::to_string(uvl::Scheduler::get_instance()
+                                          .get_active_subsystems()
+                                          .size()));
+
+            pros::lcd::set_text(
+                4, std::string("Drivetrain Default: ") +
+                       (drivetrain.get_default_command()->get()->is_alive()
+                            ? "alive"
+                            : "paused"));
+
+            pros::lcd::set_text(5,
+                                std::string("Routine A: ") + routine_a_state);
+
+            pros::lcd::set_text(6,
+                                std::string("Routine B: ") + routine_b_state);
+
+            artificial_tick++;
+          },
+          []() { return false; }, [](bool) {}, {})
+          .to_ptr());
+
+  /* Initialize the scheduler */
+  uvl::Scheduler::get_instance().initialize();
 }
 
 /**
@@ -74,21 +118,70 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 void opcontrol() {
-	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
-	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
+  /*
+pros::Controller master(pros::E_CONTROLLER_MASTER);
+pros::MotorGroup left_mg({1, -2, 3});   // Creates a motor group with forwards
+                                    // ports 1 & 3 and reversed port 2
+pros::MotorGroup right_mg({-4, 5, -6}); // Creates a motor group with forwards
+                                    // port 5 and reversed ports 4 & 6
 
+while (true) {
+pros::lcd::print(0, "%d %d %d",
+               (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
+               (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
+               (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >>
+                   0); // Prints status of the emulated screen LCDs
 
-	while (true) {
-		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
-		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
-		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
+// Arcade control scheme
+int dir = master.get_analog(
+  ANALOG_LEFT_Y); // Gets amount forward/backward from left joystick
+int turn = master.get_analog(
+  ANALOG_RIGHT_X);       // Gets the turn left/right from right joystick
+left_mg.move(dir - turn);  // Sets left motor voltage
+right_mg.move(dir + turn); // Sets right motor voltage
+pros::delay(20);           // Run for 20 ms then update
+}
+          */
 
-		// Arcade control scheme
-		int dir = master.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
-		int turn = master.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
-		left_mg.move(dir - turn);                      // Sets left motor voltage
-		right_mg.move(dir + turn);                     // Sets right motor voltage
-		pros::delay(20);                               // Run for 20 ms then update
-	}
+  uint32_t routine_a_start = 0;
+  uvl::FunctionCommand routine_a(
+      [&routine_a_start]() {
+        routine_a_state = "initialized";
+        routine_a_start = pros::millis();
+      },
+      []() {
+        routine_a_state =
+            "executing - " + std::to_string(pros::millis()) + " " +
+            std::to_string(master.get_digital(uvl::TriggerButton::kA));
+      },
+      [&routine_a_start]() { return pros::millis() >= routine_a_start + 4; },
+      [](bool interrupted) {
+        routine_a_state = interrupted ? "interrupted" : "success";
+      },
+      {});
+
+  uint32_t routine_b_start = 0;
+  uvl::FunctionCommand routine_b(
+      [&routine_b_start]() {
+        routine_b_state = "initialized";
+        routine_b_start = pros::millis();
+      },
+      []() {
+        routine_b_state =
+            "executing - " + std::to_string(pros::millis()) + " " +
+            std::to_string(master.get_digital(uvl::TriggerButton::kB));
+      },
+      [&routine_b_start]() { return pros::millis() >= routine_b_start + 10; },
+      [](bool interrupted) {
+        routine_b_state = interrupted ? "interrupted" : "success";
+      },
+      {});
+
+  master.get_trigger(uvl::TriggerButton::kA)
+      .on_true(std::move(routine_a).to_ptr());
+
+  master.get_trigger(uvl::TriggerButton::kB)
+      .while_true(std::move(routine_b).to_ptr());
+
+  uvl::Scheduler::get_instance().mainloop();
 }

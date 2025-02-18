@@ -297,7 +297,7 @@
                 "version": "8.3.8"
             },
             "uvlib": {
-                "location": "C:\\Users\\umaye\\AppData\\Roaming\\PROS\\templates\\uvlib@0.4.0",
+                "location": "C:\\Users\\umaye\\AppData\\Roaming\\PROS\\templates\\uvlib@0.4.2",
                 "metadata": {
                     "origin": "uvlib"
                 },
@@ -305,18 +305,29 @@
                 "py/object": "pros.conductor.templates.local_template.LocalTemplate",
                 "supported_kernels": "^4.1.1",
                 "system_files": [
-                    "include\\uvlib\\singleton.hpp",
-                    "include\\uvlib\\command_api.hpp",
+                    "include\\uvlib\\commands\\advanced_commands\\wait_command.hpp",
+                    "include\\uvlib\\input\\joystick.hpp",
                     "include\\uvlib\\input_api.hpp",
+                    "include\\uvlib\\commands\\advanced_commands\\instant_command.hpp",
                     "firmware\\uvlib.a",
-                    "include\\uvlib\\typedefs.hpp",
+                    "include\\uvlib\\command_api.hpp",
+                    "include\\uvlib\\commands\\advanced_commands\\sequential_command_group.hpp",
+                    "include\\uvlib\\commands\\advanced_commands\\wait_until_command.hpp",
+                    "include\\uvlib\\singleton.hpp",
+                    "include\\uvlib\\commands\\command_helper.hpp",
                     "include\\uvlib\\scheduler.hpp",
+                    "include\\uvlib\\input\\controller.hpp",
+                    "include\\uvlib\\commands\\commandptr.hpp",
+                    "include\\uvlib\\input\\trigger.hpp",
+                    "include\\uvlib\\enums.hpp",
+                    "include\\uvlib\\commands\\advanced_commands\\function_command.hpp",
+                    "include\\uvlib\\commands\\command.hpp",
                     "include\\uvlib\\subsystem.hpp",
-                    "include\\uvlib\\enums.hpp"
+                    "include\\uvlib\\typedefs.hpp"
                 ],
                 "target": "v5",
                 "user_files": [],
-                "version": "0.4.0"
+                "version": "0.4.2"
             }
         },
         "upload_options": {},

@@ -18,7 +18,7 @@ namespace uvl {
  * Scheduler::get_instance() method instead.
  */
 class Scheduler : public Singleton<Scheduler> {
- public:
+public:
   /**
    * To get a reference to the active scheduler in the current environment, use
    * the following command:
@@ -129,10 +129,12 @@ class Scheduler : public Singleton<Scheduler> {
    * @return Get a const reference to the subsystems that are being used by the
    * scheduled commands.
    */
-  const std::unordered_map<Subsystem *, Command *> &get_active_subsystems()
-      const;
+  const std::unordered_map<Subsystem *, Command *> &
+  get_active_subsystems() const {
+    return m_active_subsystems;
+  }
 
- private:
+private:
   friend class Singleton;
   friend class Subsystem;
 
@@ -177,4 +179,4 @@ class Scheduler : public Singleton<Scheduler> {
    */
   void dealloc_owned_command(Command *command);
 };
-}  // namespace uvl
+} // namespace uvl
